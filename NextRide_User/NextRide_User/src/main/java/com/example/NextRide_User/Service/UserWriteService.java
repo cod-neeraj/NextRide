@@ -9,17 +9,20 @@ import com.example.NextRide_User.Exception.EmailAlreadyExistsException;
 import com.example.NextRide_User.Exception.InvalidCredentialsException;
 import com.example.NextRide_User.Exception.PhoneAlreadyExistsException;
 import com.example.NextRide_User.Exception.UserNotExistException;
+import com.example.NextRide_User.Kafka.Send.DriverRegisterEvent;
 import com.example.NextRide_User.Mapper.UserMapper;
 import com.example.NextRide_User.Models.User;
+import com.example.NextRide_User.Models.UserRole;
 import com.example.NextRide_User.Models.UserStatus;
 import com.example.NextRide_User.Repository.UserRepository;
 import com.example.NextRide_User.Security.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.sql.Update;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.types.Expirations;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +33,7 @@ public class UserWriteService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final RefreshTokenService refreshTokenService;
+    private final KafkaTemplate<String,DriverRegisterEvent> kafkaTemplate;
 
 
     public AuthResponse registerUser(UserRegister userRegister) {
@@ -53,6 +57,18 @@ public class UserWriteService {
         String accessToken  = jwtUtil.generateToken(saved);
         String refreshToken = jwtUtil.generateRefreshToken(saved);
         refreshTokenService.storeRefreshToken(saved.getId(), refreshToken);
+        if (saved.getRole() == UserRole.DRIVER) {
+            DriverRegisterEvent event = DriverRegisterEvent.builder()
+                    .userId(saved.getId())
+                    .fullName(saved.getFullName())
+                    .email(saved.getEmail())
+                    .phone(saved.getPhone())
+                    .registeredAt(Instant.now())
+                    .build();
+
+            kafkaTemplate.send("driver.registered", event);
+        }
+
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

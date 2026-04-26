@@ -22,24 +22,16 @@ public class DriverProfile {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
+    private UUID userId;
+
     @Column(nullable = false)
     private String fullName;
 
-    @Column(unique = true, nullable = false)
-    private String phoneNumber;
-
-    @Column(unique = true, nullable = false)
-    private String email;
 
     private String profilePhotoUrl;
 
     @Enumerated(EnumType.STRING)
     private DriverStatus status;
-
-    @Column(nullable = false)
-    private String password;
-
-    private boolean isOnline;
 
     private Double currentLat;
     private Double currentLng;
@@ -47,8 +39,6 @@ public class DriverProfile {
     private String street;
     private String city;
     private String state;
-
-    private String role = "DRIVER";
 
     @CreationTimestamp
     @Column(updatable = false)

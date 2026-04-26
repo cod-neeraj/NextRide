@@ -78,6 +78,20 @@ public class GlobalExceptionHandler {
                         .path(request.getRequestURI())
                         .build());
     }
+    @ExceptionHandler(LongLatNullException.class)
+    public ResponseEntity<ApiError> longLatNull(
+           LongLatNullException ex,
+            HttpServletRequest request) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.builder()
+                        .status(409)
+                        .error("Longitude or Latitude is Null")
+                        .message(ex.getMessage())
+                        .timestamp(Instant.now())
+                        .path(request.getRequestURI())
+                        .build());
+    }
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiError> handleCredentials(
             InvalidCredentialsException ex,

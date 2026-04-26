@@ -1,6 +1,7 @@
 package com.example.NextRider_Driver.Models.Entity;
 import com.example.NextRider_Driver.Models.Enums.FuelType;
 import com.example.NextRider_Driver.Models.Enums.VehicleType;
+import com.example.NextRider_Driver.Models.Enums.VerificationStatus;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
@@ -48,7 +49,8 @@ public class DriverVehicle {
     @Enumerated(EnumType.STRING)
     private FuelType fuelType;
 
-    private boolean isActive;
+    private VerificationStatus status;
+
 
     @CreationTimestamp
     @Column(updatable = false)

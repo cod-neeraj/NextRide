@@ -22,40 +22,11 @@ public class JwtUtil {
     @Value("${app.jwt.expiration-ms}")
     private long jwtExpirationMs;
 
-    @Value("${app.jwt.refresh-expiration-ms}")
-    private long refreshExpirationMs;
-
-    public String generateToken(DriverProfile driver) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", driver.getId().toString());
-        claims.put("role",   driver.getRole());
-        return buildToken(claims, driver.getPhoneNumber());
-    }
-
-    private String buildToken(Map<String, Object> extraClaims, String subject) {
-        return Jwts.builder()
-                .claims(extraClaims)
-                .subject(subject)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(getSigningKey())
-                .compact();
-    }
-
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername())
-                && !isTokenExpired(token);
-    }
-
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
 
     public UUID extractUserId(String token) {
         String userId = extractClaim(token,
-                claims -> claims.get("userId", String.class));
-        return UUID.fromString(userId);
+                claims -> claims.get("userId", String.class)); // get as String
+        return UUID.fromString(userId);                    // convert to UUID
     }
 
     // Extract role
@@ -64,11 +35,8 @@ public class JwtUtil {
                 claims -> claims.get("role", String.class));
     }
 
-    public long getExpirationMs() {
-        return jwtExpirationMs;
-    }
 
-    private boolean isTokenExpired(String token) {
+    public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
@@ -94,23 +62,4 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateRefreshToken(DriverProfile user) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId().toString());
-        claims.put("type", "REFRESH");
-        return Jwts.builder()
-                .claims(claims)
-                .subject(user.getEmail())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshExpirationMs))
-                .signWith(getSigningKey())
-                .compact();
-    }
-
-    // Check if token is refresh type
-    public boolean isRefreshToken(String token) {
-        String type = extractClaim(token,
-                claims -> claims.get("type", String.class));
-        return "REFRESH".equals(type);
-    }
 }

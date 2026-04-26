@@ -10,5 +10,6 @@ import java.util.UUID;
 @Repository
 public interface DriverProfileRepository extends JpaRepository<DriverProfile, UUID> {
 
-    Optional<DriverProfile> findByPhoneNumber(String phoneNumber);
+    Optional<DriverProfile> findByUserId(UUID userId);
+
 }

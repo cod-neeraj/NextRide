@@ -4,7 +4,7 @@ import com.example.NextRider_Driver.Models.Enums.VerificationStatus;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,7 +48,7 @@ public class DriverDocument {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    @CreationTimestamp
+    @UpdateTimestamp
     private LocalDateTime updatedAt;
 
     @PrePersist

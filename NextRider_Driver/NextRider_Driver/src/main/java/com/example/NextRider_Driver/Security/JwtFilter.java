@@ -1,5 +1,4 @@
 package com.example.NextRider_Driver.Security;
-import com.example.NextRider_Driver.Service.DriverBasicService;
 import io.jsonwebtoken.io.IOException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -15,71 +15,56 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final DriverBasicService userBasicService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
-            throws ServletException, IOException, java.io.IOException {
+            throws ServletException, java.io.IOException {
 
-        String jwtToken = null;
+        String token = extractToken(request);
 
-        // 1. Extract from cookie
+        if (token != null && !jwtUtil.isTokenExpired(token)) {
+
+            // Just read claims from token — no DB call
+            UUID userId = jwtUtil.extractUserId(token);
+            String role = jwtUtil.extractRole(token);
+
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(
+                            userId,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    );
+
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        // check cookie first
         if (request.getCookies() != null) {
-            jwtToken = Arrays.stream(request.getCookies())
+            return Arrays.stream(request.getCookies())
                     .filter(c -> "access_token".equals(c.getName()))
                     .map(Cookie::getValue)
                     .findFirst()
                     .orElse(null);
         }
-
-        // 2. Fallback to header
-        if (jwtToken == null) {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                jwtToken = authHeader.substring(7);
-            }
+        // fallback to header
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
         }
-
-        try {
-            if (jwtToken != null) {
-
-                String username = jwtUtil.extractUsername(jwtToken);
-
-                if (username != null &&
-                        SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                    UserDetails userDetails =
-                            userBasicService.loadUserByUsername(username);
-
-                    if (userDetails != null &&
-                            jwtUtil.isTokenValid(jwtToken, userDetails)) {
-
-                        UsernamePasswordAuthenticationToken authToken =
-                                new UsernamePasswordAuthenticationToken(
-                                        userDetails,
-                                        null,
-                                        userDetails.getAuthorities()
-                                );
-
-                        authToken.setDetails(
-                                new WebAuthenticationDetailsSource().buildDetails(request)
-                        );
-
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        filterChain.doFilter(request, response);
+        return null;
     }
 }

@@ -32,18 +32,21 @@ public class DriverWriteService {
     private final RedisTemplate stringRedisTemplate;
 
     public void registerDriver(DriverRegisterEvent driverRegisterEvent){
+        System.out.println("👍");
         DriverProfile driverProfile = DriverProfile.builder()
                 .userId(driverRegisterEvent.getUserId())
                 .fullName(driverRegisterEvent.getFullName())
                 .status(DriverStatus.OFFLINE)
                 .build();
-
+        System.out.println("👍");
         driverProfileRepository.save(driverProfile);
+        System.out.println("👍");
     }
     public DriverProfileResponse registerProfileDriver(RegisterProfile registerProfile, UUID userId){
         DriverProfile driverProfile = driverProfileRepository.findByUserId(userId)
                 .orElseThrow(()-> new UserNotExistException("User not exist Please SignUp first"));
 
+        System.out.println("👍");
         driverProfile.setProfilePhotoUrl(registerProfile.getProfilePhotoUrl());
         driverProfile.setCurrentLat(registerProfile.getCurrentLat());
         driverProfile.setCurrentLng(registerProfile.getCurrentLng());
@@ -52,6 +55,7 @@ public class DriverWriteService {
         driverProfile.setStreet(registerProfile.getStreet());
 
         driverProfileRepository.save(driverProfile);
+        System.out.println("👍");
         return driverProfileMapper.toResponse(driverProfile);
     }
 
@@ -62,7 +66,7 @@ public class DriverWriteService {
         if(driverProfile.getStatus() == DriverStatus.ON_RIDE) {
             throw new RuntimeException("Cannot change status during active ride");
         }
-        if(statusChangeRequest.getStatus()==DriverStatus.AVAILABLE){
+        if(statusChangeRequest.getStatus().equalsIgnoreCase("AVAILABLE")){
             if(statusChangeRequest.getLat() == null || statusChangeRequest.getLon() == null){
                 throw new LongLatNullException("Long or Lat is empty");
             }
@@ -74,28 +78,29 @@ public class DriverWriteService {
                     "drivers:geo",
                     new Point(statusChangeRequest.getLon(),
                             statusChangeRequest.getLat()),
-                    userId
+                    userId.toString()
             );
             redisTemplate.opsForValue().set(
-                    "driver:status:" + userId,
-                    "AVAILABLE",
-                    30, TimeUnit.SECONDS
+                    "driver:status:" + userId.toString(),
+                    "AVAILABLE"
             );
             redisTemplate.opsForValue().set(
-                    "driver:location:" + userId,
-                    statusChangeRequest.getLat() + "," + statusChangeRequest.getLon(),
-                    30, TimeUnit.SECONDS
+                    "driver:location:" + userId.toString(),
+                    statusChangeRequest.getLat() + "," + statusChangeRequest.getLon()
             );
+            // kafka to notiifcation to setup websocet connection
 
         }else{
             driverProfile.setStatus(DriverStatus.OFFLINE);
             driverProfileRepository.save(driverProfile);
             stringRedisTemplate.opsForGeo().remove(
                     "drivers:geo",
-                    userId
+                    userId.toString()
             );
-            redisTemplate.delete("driver:status:" + userId);
-            redisTemplate.delete("driver:location:" + userId);
+            redisTemplate.delete("driver:status:" + userId.toString());
+            redisTemplate.delete("driver:location:" + userId.toString());
+
+            // kafka to remove websocekt comnnection
 
         }
 

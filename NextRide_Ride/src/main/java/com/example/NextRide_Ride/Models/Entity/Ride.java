@@ -1,9 +1,11 @@
 package com.example.NextRide_Ride.Models.Entity;
 
 import com.example.NextRide_Ride.Models.Enums.RideStatus;
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -46,12 +48,11 @@ public class Ride {
     @Column(nullable = false, updatable = false)
     private Instant requestedAt;
 
-    @Column(nullable = false, updatable = false)
 
     @CreationTimestamp
     private Instant createdAt;
 
-    @Column(nullable = false)
+    @UpdateTimestamp
     private Instant updatedAt;
 
 
@@ -60,17 +61,5 @@ public class Ride {
         if (this.id == null) {
             this.id = UuidCreator.getTimeOrderedEpoch();
         }
-    }
-    @PrePersist
-    protected void onCreate() {
-        Instant now = Instant.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        this.requestedAt = now;
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = Instant.now();
     }
 }

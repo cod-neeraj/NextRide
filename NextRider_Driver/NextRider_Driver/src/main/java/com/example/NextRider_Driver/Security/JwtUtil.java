@@ -34,7 +34,14 @@ public class JwtUtil {
         return extractClaim(token,
                 claims -> claims.get("role", String.class));
     }
-
+    public boolean isTokenValid(String token) {
+        try {
+            extractAllClaims(token); // this verifies signature
+            return !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());

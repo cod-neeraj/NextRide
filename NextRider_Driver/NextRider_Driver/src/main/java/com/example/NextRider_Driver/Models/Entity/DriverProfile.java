@@ -40,6 +40,7 @@ public class DriverProfile {
     private String city;
     private String state;
 
+    private Double rating = 0.0;
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

@@ -25,6 +25,10 @@ public class RideController {
 
     @PostMapping("/request")
     public ResponseEntity<ApiResponse<RideResponse>> requestRide(@RequestBody @Valid RideRequest rideRequest){
+        System.out.println(rideRequest.getDropoffLat());
+        System.out.println(rideRequest.getDropoffLng());
+        System.out.println(rideRequest.getPickupLat());
+        System.out.println(rideRequest.getPickupLng());
         RideResponse rideResponse = rideWriteService.requestRide(rideRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<RideResponse>builder()
                 .data(rideResponse)

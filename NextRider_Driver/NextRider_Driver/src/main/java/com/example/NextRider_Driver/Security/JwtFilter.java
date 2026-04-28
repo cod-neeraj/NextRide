@@ -25,30 +25,38 @@ public class JwtFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return path.startsWith("/api/auth");
+    }
+    @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, java.io.IOException {
 
         String token = extractToken(request);
+        try {
+            if (token != null && !jwtUtil.isTokenExpired(token) && jwtUtil.isTokenValid(token)) {
 
-        if (token != null && !jwtUtil.isTokenExpired(token)) {
+                // Just read claims from token — no DB call
+                UUID userId = jwtUtil.extractUserId(token);
+                String role = jwtUtil.extractRole(token);
 
-            // Just read claims from token — no DB call
-            UUID userId = jwtUtil.extractUserId(token);
-            String role = jwtUtil.extractRole(token);
+                UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken(
+                                userId,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                        );
 
-            UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(
-                            userId,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                    );
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
 
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            filterChain.doFilter(request, response);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        filterChain.doFilter(request, response);
     }
 
     private String extractToken(HttpServletRequest request) {

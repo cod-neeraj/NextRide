@@ -11,8 +11,10 @@ public class KafkaWriteService {
 
     private final DriverWriteService driverWriteService;
 
-    @KafkaListener(topics = "driver.registered",groupId = "next_ride")
+    @KafkaListener(topics = "driver.registered",groupId = "next_ride3")
     public void registerDriver(DriverRegisterEvent driverRegisterEvent){
+        System.out.println("👍👍");
        driverWriteService.registerDriver(driverRegisterEvent);
     }
+
 }

@@ -61,12 +61,16 @@ public class UserWriteService {
             DriverRegisterEvent event = DriverRegisterEvent.builder()
                     .userId(saved.getId())
                     .fullName(saved.getFullName())
-                    .email(saved.getEmail())
-                    .phone(saved.getPhone())
-                    .registeredAt(Instant.now())
                     .build();
 
-            kafkaTemplate.send("driver.registered", event);
+            kafkaTemplate.send("driver.registered", event)
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            System.out.println("FAILED: " + ex.getMessage());
+                        } else {
+                            System.out.println("SENT SUCCESS");
+                        }
+                    });
         }
 
 

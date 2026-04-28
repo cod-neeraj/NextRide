@@ -1,9 +1,9 @@
 package com.example.NextRide_Ride.Exception;
 
-import com.example.NextRider_Driver.Response.ApiError;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.security.SignatureException;
+import com.example.NextRide_Ride.Response.ApiError;
+//import io.jsonwebtoken.ExpiredJwtException;
+//import io.jsonwebtoken.MalformedJwtException;
+//import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -138,26 +138,24 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    // ─── 7. JWT expired ───────────────────────────────────────────────────────
-    @ExceptionHandler(ExpiredJwtException.class)
-    public ResponseEntity<ApiError> handleExpiredJwt(
-            ExpiredJwtException ex,
-            HttpServletRequest request) {
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiError.builder()
-                        .status(401)
-                        .error("TOKEN_EXPIRED")
-                        .message("Access token has expired")
-                        .timestamp(Instant.now())
-                        .path(request.getRequestURI())
-                        .build());
-    }
+//    // ─── 7. JWT expired ───────────────────────────────────────────────────────
+//    @ExceptionHandler(ExpiredJwtException.class)
+//    public ResponseEntity<ApiError> handleExpiredJwt(
+//            ExpiredJwtException ex,
+//            HttpServletRequest request) {
+//
+//        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+//                .body(ApiError.builder()
+//                        .status(401)
+//                        .error("TOKEN_EXPIRED")
+//                        .message("Access token has expired")
+//                        .timestamp(Instant.now())
+//                        .path(request.getRequestURI())
+//                        .build());
+//    }
 
     // ─── 8. JWT invalid / malformed ───────────────────────────────────────────
     @ExceptionHandler({
-            MalformedJwtException.class,
-            SignatureException.class,
             InvalidTokenException.class
     })
     public ResponseEntity<ApiError> handleInvalidJwt(

@@ -9,7 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class StatusChangeRequest {
-    private DriverStatus status;
+    private String status;
     private Double lon;
     private Double lat;
 }

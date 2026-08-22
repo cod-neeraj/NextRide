@@ -1,0 +1,222 @@
+name: Rider Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "NextRide_User/**"
+      - ".github/workflows/rider-cicd.yml"
+
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - "NextRide_User/**"
+      - ".github/workflows/rider-cicd.yml"
+
+  workflow_dispatch:
+
+
+# ============================================================
+# GLOBAL CONFIGURATION
+# ============================================================
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/nextride-rider-backend
+  APP_DIR: NextRide_User
+
+
+jobs:
+
+  # ==========================================================
+  # JOB 1 — BUILD + UNIT TESTS (Maven)
+  # ==========================================================
+
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history needed for SonarQube analysis
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run tests with coverage (JaCoCo)
+        run: mvn -B clean verify
+
+      # --------------------------------------------------------
+      # Upload coverage + compiled classes so SonarQube job
+      # doesn't need to rebuild from scratch
+      # --------------------------------------------------------
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            ${{ env.APP_DIR }}/target/site/jacoco
+            ${{ env.APP_DIR }}/target/classes
+          retention-days: 1
+
+
+  # ==========================================================
+  # JOB 2 — SONARQUBE CODE QUALITY SCAN
+  # ==========================================================
+
+  sonarqube:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+
+    needs: test
+
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.APP_DIR }}/target
+
+      - name: SonarQube Scan (Maven)
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.projectKey=nextride-rider-backend \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.java.coveragePlugin=jacoco \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+
+  # ==========================================================
+  # JOB 3 — TRIVY SOURCE / DEPENDENCY SECURITY SCAN
+  # ==========================================================
+
+  security:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+
+    needs: test
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trivy vulnerability and secret scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ./NextRide_User
+          scanners: vuln,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
+
+  # ==========================================================
+  # JOB 4 — BUILD, SCAN & PUSH DOCKER IMAGE TO DOCKER HUB
+  # ==========================================================
+
+  docker:
+    name: Build, Scan & Push Docker Image
+    runs-on: ubuntu-latest
+
+    needs:
+      - sonarqube
+      - security
+
+    if: >
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --------------------------------------------------------
+      # Build image locally first (load: true) so Trivy can scan
+      # it BEFORE anything gets pushed
+      # --------------------------------------------------------
+
+      - name: Build backend Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./NextRide_User
+          file: ./NextRide_User/Dockerfile
+
+          push: false
+          load: true
+
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy Docker image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
+      # --------------------------------------------------------
+      # Login to Docker Hub
+      # --------------------------------------------------------
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # --------------------------------------------------------
+      # Push image only after it passed the vulnerability scan
+      # --------------------------------------------------------
+
+      - name: Tag and push image
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:latest

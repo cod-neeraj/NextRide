@@ -1,0 +1,31 @@
+package com.example.NextRider_Driver.Models.Enums;
+
+public enum DocumentType {
+
+    PROFILE_PHOTO,
+
+    AADHAAR_FRONT,
+    AADHAAR_BACK,
+
+    DRIVING_LICENSE_FRONT,
+    DRIVING_LICENSE_BACK,
+
+    PAN_CARD,
+
+    VEHICLE_RC_FRONT,
+    VEHICLE_RC_BACK,
+
+    VEHICLE_INSURANCE,
+
+    POLLUTION_CERTIFICATE,
+
+    FITNESS_CERTIFICATE,
+
+    VEHICLE_PHOTOS,
+
+    BANK_PASSBOOK,
+
+    CANCELLED_CHEQUE,
+
+    SELFIE_WITH_LICENSE
+}

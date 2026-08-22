@@ -1,0 +1,2 @@
+CREATE DATABASE "NextRide_User";
+CREATE DATABASE "NextRide_Driver";

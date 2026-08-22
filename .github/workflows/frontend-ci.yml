@@ -1,0 +1,177 @@
+name: Frontend CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "speedy-ride-service-main/**"
+      - ".github/workflows/frontend-ci.yml"
+
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - "speedy-ride-service-main/**"
+      - ".github/workflows/frontend-ci.yml"
+
+  workflow_dispatch:
+
+
+# ============================================================
+# GLOBAL CONFIGURATION
+# ============================================================
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+
+
+jobs:
+
+  # ==========================================================
+  # JOB 1 — FRONTEND QUALITY
+  # ==========================================================
+
+  quality:
+    name: Frontend Quality
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: speedy-ride-service-main
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: speedy-ride-service-main/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      # --------------------------------------------------------
+      # Upload build output so later jobs don't have to rebuild
+      # --------------------------------------------------------
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: speedy-ride-service-main/dist
+          retention-days: 1
+
+
+  # ==========================================================
+  # JOB 2 — TRIVY SOURCE / DEPENDENCY SECURITY SCAN
+  # ==========================================================
+
+  security:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+
+    needs: quality
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trivy vulnerability and secret scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ./speedy-ride-service-main
+          scanners: vuln,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
+
+  # ==========================================================
+  # JOB 3 — DEPLOY TO S3 + CLOUDFRONT
+  # ==========================================================
+
+  deploy:
+    name: Deploy Frontend to S3 + CloudFront
+    runs-on: ubuntu-latest
+
+    needs:
+      - quality
+      - security
+
+    # --------------------------------------------------------
+    # Deploy ONLY when:
+    #
+    # 1. It is a push event
+    # 2. Branch is main
+    #
+    # PRs will NEVER deploy.
+    # --------------------------------------------------------
+
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+
+    permissions:
+      id-token: write   # needed only if using OIDC (see note below)
+      contents: read
+
+    steps:
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: dist
+
+      # --------------------------------------------------------
+      # Configure AWS credentials
+      # --------------------------------------------------------
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------------
+      # Sync build output to S3
+      #
+      # --delete removes old files from the bucket that no
+      # longer exist in the new build (prevents stale assets)
+      # --------------------------------------------------------
+
+      - name: Sync build to S3
+        run: |
+          aws s3 sync ./dist s3://${{ secrets.FRONTEND_S3_BUCKET }} --delete
+
+      # --------------------------------------------------------
+      # Invalidate CloudFront cache
+      #
+      # Without this, CloudFront keeps serving the OLD cached
+      # files even after the new ones are uploaded to S3.
+      # --------------------------------------------------------
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
